@@ -1,19 +1,44 @@
-import {test, expect} from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { TaskModel } from './fixtures/task.model';
+import { deleteByTaskHelper, postTaskHelper } from './support/helpers';
 
-test('Deve permitir cadastrar uma nova tarefa', async({page, request}) => {
 
-  //Dado que eu tenha uma nova tarefa
-    const taskName = 'Estudar Playwright';
-    await request.delete('http://localhost:3333/helper/tasks/' + taskName);
-  // E que eu estou na página de cadastro   
-    await page.goto('http://localhost:8080');
+test('Deve permitir cadastrar uma nova tarefa', async ({ page, request }) => {
+  const task: TaskModel = {
+    name: 'Ler um livro',
+    is_done: false
+  };
 
-  // Quando eu faço o cadastro dessa tarefa
-    const inputTaskName = page.locator('input[placeholder="Add a new Task"]');
-    await inputTaskName.fill(taskName);
-    await page.click('css=button >> text=Create');
+  await deleteByTaskHelper(request, task.name);
+  await page.goto('http://localhost:8080');
 
-  //Então a tarefa deve ser exibida na lista de tarefas
-    const target = page.getByTestId('task-item')
-    await expect(target).toHaveText(taskName);
-  });
+  const inputTaskName = page.locator('input[placeholder="Add a new Task"]');
+  await inputTaskName.fill(task.name);
+  await page.click('css=button >> text=Create');
+
+  const target = page.locator(`css=.task-item p >> text=${task.name}`);
+  await expect(target).toBeVisible();
+});
+
+test('Não deve permitir tarefa duplicada', async ({ page, request }) => {
+  //Dado que eu tenha uma tarefa já cadastrada
+  const task: TaskModel = {
+    name: 'Estudar Playwright',
+    is_done: false
+  }
+  // Garantindo que a tarefa não exista antes de criar
+  await deleteByTaskHelper(request, task.name);
+
+  await postTaskHelper(request, task);
+
+  await page.goto('http://localhost:8080');
+  // Quando tento cadastrar a mesma tarefa novamente
+  const inputTaskName = page.locator('input[placeholder="Add a new Task"]');
+  await inputTaskName.fill(task.name);
+  await page.click('css=button >> text=Create');
+
+  const target = page.locator('.swal2-html-container');
+  // Então deve ser exibida uma mensagem de erro informando que a tarefa já existe
+  await expect(target).toHaveText('Task already exists!');
+
+});
